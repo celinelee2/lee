@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 
 type Label = { id: string; name: string; isActive: boolean };
 type Student = {
@@ -96,6 +97,26 @@ export default function StudentsPage() {
     const r = await fetch(`/api/admin/students/${s.id}`, { method: "DELETE" });
     if (!r.ok) { alert((await r.json()).error); return; }
     load();
+  }
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBatchResult("");
+
+    if (file.name.endsWith(".csv")) {
+      setBatchText(await file.text());
+    } else {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 });
+      setBatchText(rows.map((r) => r.join(",")).join("\n"));
+    }
+    // reset so same file can be re-selected
+    e.target.value = "";
   }
 
   async function handleBatchImport() {
@@ -307,11 +328,31 @@ export default function StudentsPage() {
             >
               {BATCH_TEMPLATE}
             </pre>
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-1.5 rounded-lg text-sm border font-medium"
+                style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+              >
+                上傳 Excel / CSV 檔案
+              </button>
+              <span className="text-xs" style={{ color: "var(--unmarked)" }}>
+                或直接貼上文字↓
+              </span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </div>
             <textarea
               value={batchText}
               onChange={(e) => setBatchText(e.target.value)}
               rows={8}
-              placeholder="貼上 CSV 內容…"
+              placeholder="貼上 CSV 內容，或點上方按鈕上傳 Excel / CSV 檔案…"
               className="w-full border rounded-lg px-3 py-2 text-sm outline-none resize-none font-mono"
               style={{ borderColor: "var(--card-border)" }}
             />
