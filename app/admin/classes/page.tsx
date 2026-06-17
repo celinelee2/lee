@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import BatchImportModal from "../_utils/BatchImportModal";
+import { dropHeaderRow, WEEKDAY_MAP } from "../_utils/parseExcel";
 
 type Teacher = { id: string; name: string };
 type ClassTeacherLink = { userId: string; user: Teacher };
@@ -44,6 +46,10 @@ export default function ClassesPage() {
   // teacher assignment modal
   const [teacherModal, setTeacherModal] = useState<ClassItem | null>(null);
   const [selectedTeachers, setSelectedTeachers] = useState<Set<string>>(new Set());
+
+  // batch import modals
+  const [showBatchClass, setShowBatchClass] = useState(false);
+  const [batchStudentModal, setBatchStudentModal] = useState<ClassItem | null>(null);
 
   // student assignment modal
   const [studentModal, setStudentModal] = useState<ClassItem | null>(null);
@@ -216,13 +222,22 @@ export default function ClassesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold" style={{ color: "var(--text-dark)" }}>課程時段</h1>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 rounded-lg text-white text-sm font-medium"
-          style={{ backgroundColor: "var(--accent)" }}
-        >
-          新增課程時段
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBatchClass(true)}
+            className="px-4 py-2 rounded-lg text-sm border font-medium"
+            style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+          >
+            批次匯入
+          </button>
+          <button
+            onClick={openCreate}
+            className="px-4 py-2 rounded-lg text-white text-sm font-medium"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            新增課程時段
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -263,13 +278,22 @@ export default function ClassesPage() {
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => openStudentModal(cls)}
-                      className="text-xs hover:underline"
-                      style={{ color: "var(--accent)" }}
-                    >
-                      {cls._count.studentLinks} 人
-                    </button>
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        onClick={() => openStudentModal(cls)}
+                        className="text-xs hover:underline text-left"
+                        style={{ color: "var(--accent)" }}
+                      >
+                        {cls._count.studentLinks} 人
+                      </button>
+                      <button
+                        onClick={() => setBatchStudentModal(cls)}
+                        className="text-xs hover:underline text-left"
+                        style={{ color: "var(--unmarked)" }}
+                      >
+                        批次匯入
+                      </button>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -485,6 +509,73 @@ export default function ClassesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 批次匯入課程時段 */}
+      {showBatchClass && (
+        <BatchImportModal
+          title="批次匯入課程時段"
+          templateHint="欄位順序：名稱、校區、科目、星期幾（0-6 或 週一-週六）、上課時程、開課日期（YYYY-MM-DD）、結課日期"
+          templateText={`名稱,校區,科目,星期幾,上課時程,開課日期,結課日期\n週三素描班,健康國小,素描,3,週三 16:00-17:00,2026-09-01,2027-01-31`}
+          onClose={() => { setShowBatchClass(false); load(); }}
+          onImport={async (rows) => {
+            const data = dropHeaderRow(rows, "名稱")
+              .filter((r) => r[0] && r[1] && r[2])
+              .map((r) => ({
+                name: r[0], campus: r[1], subject: r[2],
+                weekday: WEEKDAY_MAP[r[3]] ?? Number(r[3]),
+                scheduleText: r[4] ?? "",
+                startDate: r[5] ?? "", endDate: r[6] ?? "",
+              }));
+            if (data.length === 0) return "沒有有效資料";
+            const res = await fetch("/api/admin/classes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+            const d = await res.json();
+            if (!res.ok) return d.error;
+            return `成功新增 ${d.count} 個課程時段`;
+          }}
+        />
+      )}
+
+      {/* 批次分配學生到班級 */}
+      {batchStudentModal && (
+        <BatchImportModal
+          title={`批次分配學生 — ${batchStudentModal.name}`}
+          templateHint="第一欄學生姓名、第二欄班別（選填，用於區分同名）："
+          templateText={`學生姓名,班別\n王小明,3年級A班\n陳美琪,`}
+          onClose={() => { setBatchStudentModal(null); load(); }}
+          onImport={async (rows) => {
+            const allStudentsRes = await fetch("/api/admin/students");
+            const allStudents: Student[] = await allStudentsRes.json();
+
+            const toAssign = dropHeaderRow(rows, "學生")
+              .filter((r) => r[0])
+              .map((r) => {
+                const name = r[0];
+                const label = r[1] ?? "";
+                return allStudents.find(
+                  (s) => s.isActive && s.name === name && (!label || s.enrollmentLabel.name === label)
+                );
+              })
+              .filter((s): s is Student => s !== undefined);
+
+            if (toAssign.length === 0) return "找不到符合的學生，請確認姓名與班別正確";
+
+            await Promise.all(
+              toAssign.map((s) =>
+                fetch(`/api/admin/classes/${batchStudentModal.id}/students`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ studentId: s.id }),
+                })
+              )
+            );
+            return `成功分配 ${toAssign.length} 位學生`;
+          }}
+        />
       )}
     </div>
   );

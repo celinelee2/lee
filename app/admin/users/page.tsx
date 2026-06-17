@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import BatchImportModal from "../_utils/BatchImportModal";
+import { dropHeaderRow } from "../_utils/parseExcel";
 
 type User = {
   id: string;
@@ -19,6 +21,7 @@ export default function UsersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [newUserInfo, setNewUserInfo] = useState<{ resetUrl: string | null } | null>(null);
   const [error, setError] = useState("");
+  const [showBatch, setShowBatch] = useState(false);
 
   async function load() {
     const r = await fetch("/api/admin/users");
@@ -70,13 +73,22 @@ export default function UsersPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold" style={{ color: "var(--text-dark)" }}>老師帳號</h1>
-        <button
-          onClick={() => { setShowModal(true); setNewUserInfo(null); setError(""); }}
-          className="px-4 py-2 rounded-lg text-white text-sm font-medium"
-          style={{ backgroundColor: "var(--accent)" }}
-        >
-          新增老師
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBatch(true)}
+            className="px-4 py-2 rounded-lg text-sm border font-medium"
+            style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+          >
+            批次匯入
+          </button>
+          <button
+            onClick={() => { setShowModal(true); setNewUserInfo(null); setError(""); }}
+            className="px-4 py-2 rounded-lg text-white text-sm font-medium"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            新增老師
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -218,6 +230,30 @@ export default function UsersPage() {
             )}
           </div>
         </div>
+      )}
+
+      {showBatch && (
+        <BatchImportModal
+          title="批次匯入老師帳號"
+          templateHint="第一欄姓名、第二欄 Email（首行標題可省略）："
+          templateText={`姓名,Email\n王老師,wang@example.com\n李老師,li@example.com`}
+          onClose={() => { setShowBatch(false); load(); }}
+          onImport={async (rows) => {
+            const data = dropHeaderRow(rows, "姓名")
+              .filter((r) => r[0] && r[1])
+              .map((r) => ({ name: r[0], email: r[1] }));
+            if (data.length === 0) return "沒有有效資料";
+            const r = await fetch("/api/admin/users", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+            const d = await r.json();
+            if (!r.ok) return d.error;
+            const errMsg = d.errors?.length ? `（${d.errors.join("；")}）` : "";
+            return `成功新增 ${d.count} 位老師${errMsg}`;
+          }}
+        />
       )}
     </div>
   );

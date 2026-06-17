@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import BatchImportModal from "../_utils/BatchImportModal";
+import { dropHeaderRow } from "../_utils/parseExcel";
 
 type Label = { id: string; name: string; isActive: boolean; _count: { students: number } };
 
@@ -12,6 +14,7 @@ export default function EnrollmentLabelsPage() {
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showBatch, setShowBatch] = useState(false);
 
   async function load() {
     const r = await fetch("/api/admin/enrollment-labels");
@@ -79,13 +82,22 @@ export default function EnrollmentLabelsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold" style={{ color: "var(--text-dark)" }}>班別管理</h1>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 rounded-lg text-white text-sm font-medium"
-          style={{ backgroundColor: "var(--accent)" }}
-        >
-          新增班別
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBatch(true)}
+            className="px-4 py-2 rounded-lg text-sm border font-medium"
+            style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+          >
+            批次匯入
+          </button>
+          <button
+            onClick={openCreate}
+            className="px-4 py-2 rounded-lg text-white text-sm font-medium"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            新增班別
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -175,6 +187,27 @@ export default function EnrollmentLabelsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {showBatch && (
+        <BatchImportModal
+          title="批次匯入班別"
+          templateHint="每行一個班別名稱，或 CSV 第一欄為班別名稱："
+          templateText={`班別名稱\n3年級A班\n4年級B班\n5年級C班`}
+          onClose={() => { setShowBatch(false); load(); }}
+          onImport={async (rows) => {
+            const data = dropHeaderRow(rows, "班別").map((r) => r[0]).filter(Boolean);
+            if (data.length === 0) return "沒有有效資料";
+            const r = await fetch("/api/admin/enrollment-labels", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            });
+            const d = await r.json();
+            if (!r.ok) return d.error;
+            return `成功新增 ${d.count} 個班別`;
+          }}
+        />
       )}
     </div>
   );
