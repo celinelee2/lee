@@ -1,0 +1,135 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(TEACHER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  classes     ClassTeacher[]
+  resetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model OrgSetting {
+  id        String   @id @default(cuid())
+  orgName   String   @default("Artpresso國際教育中心")
+  updatedAt DateTime @updatedAt
+}
+
+model Class {
+  id           String   @id @default(cuid())
+  name         String
+  campus       String
+  subject      String
+  weekday      Int
+  scheduleText String
+  startDate    DateTime @db.Date
+  endDate      DateTime @db.Date
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  teachers     ClassTeacher[]
+  studentLinks ClassStudent[]
+  sessions     ClassSession[]
+}
+
+model ClassTeacher {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, classId])
+}
+
+model EnrollmentLabel {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  students Student[]
+}
+
+model Student {
+  id                String          @id @default(cuid())
+  name              String
+  studentNumber     String?
+  enrollmentLabelId String
+  enrollmentLabel   EnrollmentLabel @relation(fields: [enrollmentLabelId], references: [id])
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+
+  classLinks  ClassStudent[]
+  attendances Attendance[]
+}
+
+model ClassStudent {
+  id        String   @id @default(cuid())
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id])
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([classId, studentId])
+}
+
+model ClassSession {
+  id          String    @id @default(cuid())
+  classId     String
+  class       Class     @relation(fields: [classId], references: [id])
+  sessionDate DateTime  @db.Date
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  attendances Attendance[]
+
+  @@unique([classId, sessionDate])
+}
+
+model Attendance {
+  id        String           @id @default(cuid())
+  sessionId String
+  session   ClassSession     @relation(fields: [sessionId], references: [id])
+  studentId String
+  student   Student          @relation(fields: [studentId], references: [id])
+  status    AttendanceStatus
+  markedAt  DateTime         @default(now())
+  markedBy  String
+
+  @@unique([sessionId, studentId])
+}
