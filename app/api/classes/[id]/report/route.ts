@@ -48,7 +48,7 @@ export async function GET(
   const studentLinks = await prisma.classStudent.findMany({
     where: { classId, isActive: true },
     include: { student: { include: { enrollmentLabel: { select: { name: true } } } } },
-    orderBy: [{ student: { enrollmentLabel: { name: "asc" } } }, { student: { name: "asc" } }],
+    orderBy: [{ student: { enrollmentLabel: { name: "asc" } } }, { student: { nameZh: "asc" } }],
   });
 
   const expected = countExpectedSessions(year, month, cls.weekday, cls.startDate, cls.endDate);
@@ -63,7 +63,7 @@ export async function GET(
     return {
       id: link.student.id,
       seqNo: link.student.studentNumber ?? String(idx + 1),
-      name: link.student.name,
+      name: link.student.nameZh,
       enrollmentLabelName: link.student.enrollmentLabel.name,
       present,
       absent,

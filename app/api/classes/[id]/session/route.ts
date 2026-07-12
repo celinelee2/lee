@@ -32,7 +32,7 @@ export async function GET(
   const studentLinks = await prisma.classStudent.findMany({
     where: { classId, isActive: true },
     include: { student: { include: { enrollmentLabel: { select: { name: true } } } } },
-    orderBy: [{ student: { enrollmentLabel: { name: "asc" } } }, { student: { name: "asc" } }],
+    orderBy: [{ student: { enrollmentLabel: { name: "asc" } } }, { student: { nameZh: "asc" } }],
   });
 
   const attendances = await prisma.attendance.findMany({
@@ -42,7 +42,7 @@ export async function GET(
 
   const students = studentLinks.map((link, idx) => ({
     id: link.student.id,
-    name: link.student.name,
+    name: link.student.nameZh,
     studentNumber: link.student.studentNumber,
     seqNo: idx + 1,
     enrollmentLabel: link.student.enrollmentLabel,

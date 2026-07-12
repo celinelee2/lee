@@ -8,7 +8,7 @@ export async function GET() {
 
   const students = await prisma.student.findMany({
     include: { enrollmentLabel: { select: { id: true, name: true } } },
-    orderBy: [{ enrollmentLabel: { name: "asc" } }, { name: "asc" }],
+    orderBy: [{ enrollmentLabel: { name: "asc" } }, { nameZh: "asc" }],
   });
   return NextResponse.json(students);
 }
@@ -19,16 +19,16 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
 
-  // batch import: [{ name, enrollmentLabelId, studentNumber? }]
+  // batch import: [{ nameZh, enrollmentLabelId, studentNumber? }]
   if (Array.isArray(body)) {
     if (body.length === 0) {
       return NextResponse.json({ error: "名單不得為空" }, { status: 400 });
     }
     const created = await prisma.$transaction(
-      body.map((s: { name: string; enrollmentLabelId: string; studentNumber?: string }) =>
+      body.map((s: { nameZh: string; enrollmentLabelId: string; studentNumber?: string }) =>
         prisma.student.create({
           data: {
-            name: s.name.trim(),
+            nameZh: s.nameZh.trim(),
             enrollmentLabelId: s.enrollmentLabelId,
             studentNumber: s.studentNumber?.trim() || null,
           },
@@ -38,14 +38,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ count: created.length }, { status: 201 });
   }
 
-  const { name, enrollmentLabelId, studentNumber } = body;
-  if (!name?.trim() || !enrollmentLabelId) {
+  const { nameZh, enrollmentLabelId, studentNumber } = body;
+  if (!nameZh?.trim() || !enrollmentLabelId) {
     return NextResponse.json({ error: "姓名與班別為必填" }, { status: 400 });
   }
 
   const student = await prisma.student.create({
     data: {
-      name: name.trim(),
+      nameZh: nameZh.trim(),
       enrollmentLabelId,
       studentNumber: studentNumber?.trim() || null,
     },

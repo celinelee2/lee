@@ -17,7 +17,7 @@ export async function GET(
       studentLinks: {
         where: { isActive: true },
         include: { student: { include: { enrollmentLabel: { select: { id: true, name: true } } } } },
-        orderBy: { student: { name: "asc" } },
+        orderBy: { student: { nameZh: "asc" } },
       },
     },
   });

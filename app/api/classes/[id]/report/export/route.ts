@@ -48,7 +48,7 @@ export async function GET(
   const studentLinks = await prisma.classStudent.findMany({
     where: { classId, isActive: true },
     include: { student: { include: { enrollmentLabel: { select: { name: true } } } } },
-    orderBy: [{ student: { enrollmentLabel: { name: "asc" } } }, { student: { name: "asc" } }],
+    orderBy: [{ student: { enrollmentLabel: { name: "asc" } } }, { student: { nameZh: "asc" } }],
   });
 
   const expected = countExpectedSessions(year, month, cls.weekday, cls.startDate, cls.endDate);
@@ -61,7 +61,7 @@ export async function GET(
       else if (att?.status === "ABSENT") absent++;
     }
     const seq = link.student.studentNumber ?? String(idx + 1);
-    return `${seq},${link.student.name},${link.student.enrollmentLabel.name},${present},${absent},${expected}`;
+    return `${seq},${link.student.nameZh},${link.student.enrollmentLabel.name},${present},${absent},${expected}`;
   });
 
   const BOM = "﻿";
