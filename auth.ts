@@ -13,24 +13,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        });
+        try {
+          const rows = await prisma.$queryRaw<Array<{
+            id: string; email: string; name: string; role: string;
+            isActive: boolean; passwordHash: string;
+          }>>`SELECT id, email, name, role, "isActive", "passwordHash" FROM "User" WHERE email = ${credentials.email as string} LIMIT 1`;
 
-        if (!user || !user.isActive) return null;
+          if (rows.length === 0 || !rows[0].isActive) return null;
 
-        const valid = await bcrypt.compare(
-          credentials.password as string,
-          user.passwordHash
-        );
-        if (!valid) return null;
+          const user = rows[0];
+          const valid = await bcrypt.compare(credentials.password as string, user.passwordHash);
+          if (!valid) return null;
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        };
+          return { id: user.id, email: user.email, name: user.name, role: user.role };
+        } catch (err) {
+          console.error("[auth] authorize error:", err);
+          return null;
+        }
       },
     }),
   ],
