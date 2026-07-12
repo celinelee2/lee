@@ -15,7 +15,8 @@ export const authConfig: NextAuthConfig = {
         pathname === "/login" ||
         pathname === "/forgot-password" ||
         pathname.startsWith("/reset-password") ||
-        pathname.startsWith("/api/auth");
+        pathname.startsWith("/api/auth") ||
+        pathname.startsWith("/api/debug");
 
       if (isPublic) return true;
       if (!isLoggedIn) return false;
