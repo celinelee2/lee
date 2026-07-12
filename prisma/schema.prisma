@@ -9,7 +9,9 @@ datasource db {
 
 enum Role {
   ADMIN
+  HR_ADMIN
   TEACHER
+  ASSISTANT
 }
 
 enum AttendanceStatus {
@@ -17,17 +19,97 @@ enum AttendanceStatus {
   ABSENT
 }
 
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  role         Role     @default(TEACHER)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+enum InvoiceType {
+  CRAM_SCHOOL
+  COMPANY
+}
 
-  classes     ClassTeacher[]
-  resetTokens PasswordResetToken[]
+enum WorkCategory {
+  ASSISTANT
+  INTERNAL_TRAINING
+  EXTERNAL_TRAINING
+  GENERAL_ADMIN
+  ADMIN_SUPERVISION
+  TEACHING_SUPERVISION
+  TRAINING_LECTURER
+}
+
+enum MovementType {
+  ONBOARD
+  RESIGN
+  TRANSFER
+  INSURANCE_CHANGE
+}
+
+enum SpecialIdentity {
+  NONE
+  ABORIGINAL
+  VETERAN
+  DISABILITY
+}
+
+enum NonInsuranceReason {
+  FARMERS_INSURANCE
+  INSUFFICIENT_HOURS
+  OTHER_UNIT_INSURED
+  NO_EMPLOYMENT_RELATION
+  OTHER
+}
+
+enum LaborInsuranceClass {
+  GENERAL
+  FARMERS_INSURANCE
+}
+
+enum HealthInsuranceClass {
+  EMPLOYEE
+  DEPENDANT
+  VOLUNTARILY
+}
+
+model OrgSetting {
+  id        String   @id @default(cuid())
+  orgName   String   @default("Artpresso國際教育中心")
+  updatedAt DateTime @updatedAt
+}
+
+model LegalEntity {
+  id                String      @id @default(cuid())
+  name              String
+  type              InvoiceType
+  taxId             String?
+  laborInsuranceNo  String?
+  healthInsuranceNo String?
+  isActive          Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+
+  users            User[]
+  schools          School[]
+  laborInsurances  LaborInsurance[]
+  laborPensions    LaborPension[]
+  healthInsurances HealthInsurance[]
+  movements        EmployeeMovement[]
+  taxWithholdings  EmployeeTaxWithholding[]
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  passwordHash  String
+  name          String
+  role          Role         @default(TEACHER)
+  legalEntityId String?
+  legalEntity   LegalEntity? @relation(fields: [legalEntityId], references: [id])
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+
+  classes         ClassTeacher[]
+  assistantClass1 ClassGroup[] @relation("Assistant1")
+  assistantClass2 ClassGroup[] @relation("Assistant2")
+  resetTokens     PasswordResetToken[]
+  adminWorkLogs   AdminWorkLog[]
+  employeeProfile EmployeeProfile?
+  salaryRecords   SalaryRecord[]
 }
 
 model PasswordResetToken {
@@ -40,36 +122,99 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 }
 
-model OrgSetting {
+model School {
+  id              String       @id @default(cuid())
+  fullName        String
+  shortName       String
+  address         String?
+  website         String?
+  contactPerson   String?
+  taxId           String?
+  cooperationDate DateTime?    @db.Date
+  legalEntityId   String?
+  legalEntity     LegalEntity? @relation(fields: [legalEntityId], references: [id])
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  classGroups   ClassGroup[]
+  adminWorkLogs AdminWorkLog[]
+}
+
+model Semester {
   id        String   @id @default(cuid())
-  orgName   String   @default("Artpresso國際教育中心")
-  updatedAt DateTime @updatedAt
+  name      String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  classGroups ClassGroup[]
+  curriculums Curriculum[]
+  feedbacks   StudentFeedback[]
+}
+
+model Curriculum {
+  id          String   @id @default(cuid())
+  semesterId  String
+  semester    Semester @relation(fields: [semesterId], references: [id])
+  subject     String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  items CurriculumItem[]
+}
+
+model CurriculumItem {
+  id            String     @id @default(cuid())
+  curriculumId  String
+  curriculum    Curriculum @relation(fields: [curriculumId], references: [id])
+  order         Int
+  theme         String
+  category      String?
+  description   String?
+  mainPigment   String?
+  paperMaterial String?
+  otherMaterial String?
+  createdAt     DateTime   @default(now())
 }
 
 model Class {
-  id           String   @id @default(cuid())
-  name         String
-  campus       String
-  subject      String
-  weekday      Int
-  scheduleText String
-  startDate    DateTime @db.Date
-  endDate      DateTime @db.Date
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id              String   @id @default(cuid())
+  semesterId      String?
+  subjectCode     String?
+  name            String
+  campus          String
+  subject         String
+  weekday         Int
+  scheduleText    String
+  startDate       DateTime @db.Date
+  endDate         DateTime @db.Date
+  holidayDates    String?
+  totalSessions   Int?
+  materialFeeType String?
+  materialFeeRate Decimal? @db.Decimal(10, 2)
+  notes           String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
 
   teachers     ClassTeacher[]
   studentLinks ClassStudent[]
   sessions     ClassSession[]
+  artworks     ArtworkSession[]
+  feedbacks    StudentFeedback[]
 }
 
 model ClassTeacher {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  classId   String
-  class     Class    @relation(fields: [classId], references: [id])
-  createdAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  classId         String
+  class           Class    @relation(fields: [classId], references: [id])
+  hourlyRate      Decimal? @db.Decimal(10, 2)
+  perStudentRate  Decimal? @db.Decimal(10, 2)
+  adminHourlyRate Decimal? @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
 
   @@unique([userId, classId])
 }
@@ -85,7 +230,8 @@ model EnrollmentLabel {
 
 model Student {
   id                String          @id @default(cuid())
-  name              String
+  nameZh            String
+  nameEn            String?
   studentNumber     String?
   enrollmentLabelId String
   enrollmentLabel   EnrollmentLabel @relation(fields: [enrollmentLabelId], references: [id])
@@ -93,7 +239,10 @@ model Student {
   createdAt         DateTime        @default(now())
 
   classLinks  ClassStudent[]
+  groupLinks  ClassGroupStudent[]
   attendances Attendance[]
+  artworks    Artwork[]
+  feedbacks   StudentFeedback[]
 }
 
 model ClassStudent {
@@ -106,6 +255,42 @@ model ClassStudent {
   createdAt DateTime @default(now())
 
   @@unique([classId, studentId])
+}
+
+model ClassGroup {
+  id           String   @id @default(cuid())
+  semesterId   String
+  semester     Semester @relation(fields: [semesterId], references: [id])
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id])
+  className    String
+  schoolClass  String
+  subject      String
+  weekday      Int
+  classTime    String
+  teacherId    String
+  teacher      User     @relation(fields: [teacherId], references: [id])
+  assistant1Id String?
+  assistant1   User?    @relation("Assistant1", fields: [assistant1Id], references: [id])
+  assistant2Id String?
+  assistant2   User?    @relation("Assistant2", fields: [assistant2Id], references: [id])
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  students ClassGroupStudent[]
+}
+
+model ClassGroupStudent {
+  id           String     @id @default(cuid())
+  classGroupId String
+  classGroup   ClassGroup @relation(fields: [classGroupId], references: [id])
+  studentId    String
+  student      Student    @relation(fields: [studentId], references: [id])
+  notes        String?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+
+  @@unique([classGroupId, studentId])
 }
 
 model ClassSession {
@@ -132,4 +317,206 @@ model Attendance {
   markedBy  String
 
   @@unique([sessionId, studentId])
+}
+
+model ArtworkSession {
+  id          String   @id @default(cuid())
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id])
+  sessionDate DateTime @db.Date
+  uploadedBy  String
+  createdAt   DateTime @default(now())
+
+  artworks Artwork[]
+
+  @@unique([classId, sessionDate])
+}
+
+model Artwork {
+  id                String         @id @default(cuid())
+  artworkSessionId  String
+  artworkSession    ArtworkSession @relation(fields: [artworkSessionId], references: [id])
+  studentId         String?
+  student           Student?       @relation(fields: [studentId], references: [id])
+  imageUrl          String
+  recognitionMethod String?
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model StudentFeedback {
+  id           String   @id @default(cuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id])
+  classId      String
+  class        Class    @relation(fields: [classId], references: [id])
+  semesterId   String
+  semester     Semester @relation(fields: [semesterId], references: [id])
+  feedbackType String
+  content      String
+  writtenBy    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([studentId, classId, semesterId, feedbackType])
+}
+
+model AdminWorkLog {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  workDate  DateTime     @db.Date
+  category  WorkCategory
+  hCode     String?
+  schoolId  String?
+  school    School?      @relation(fields: [schoolId], references: [id])
+  hours     Float
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model SalaryItem {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  category  String
+  name      String
+  calcType  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model SalaryRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  month       String
+  status      String   @default("DRAFT")
+  totalAmount Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items SalaryRecordItem[]
+
+  @@unique([userId, month])
+}
+
+model SalaryRecordItem {
+  id             String       @id @default(cuid())
+  salaryRecordId String
+  salaryRecord   SalaryRecord @relation(fields: [salaryRecordId], references: [id])
+  code           String
+  name           String
+  addDeduct      String
+  quantity       Decimal?     @db.Decimal(10, 2)
+  rate           Decimal?     @db.Decimal(10, 2)
+  amount         Decimal      @db.Decimal(10, 2)
+  note           String?
+  createdAt      DateTime     @default(now())
+}
+
+model EmployeeProfile {
+  id              String          @id @default(cuid())
+  userId          String          @unique
+  user            User            @relation(fields: [userId], references: [id])
+  employeeNo      String?         @unique
+  idNumber        String?
+  birthDate       DateTime?       @db.Date
+  specialIdentity SpecialIdentity @default(NONE)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  laborInsurances  LaborInsurance[]
+  laborPensions    LaborPension[]
+  healthInsurances HealthInsurance[]
+  movements        EmployeeMovement[]
+  taxWithholdings  EmployeeTaxWithholding[]
+}
+
+model LaborInsurance {
+  id                String               @id @default(cuid())
+  employeeProfileId String
+  employeeProfile   EmployeeProfile      @relation(fields: [employeeProfileId], references: [id])
+  legalEntityId     String
+  legalEntity       LegalEntity          @relation(fields: [legalEntityId], references: [id])
+  isEnrolled        Boolean              @default(true)
+  nonEnrollReason   NonInsuranceReason?
+  insuranceSalary   Int?
+  reportCount       Int?
+  insuranceClass    LaborInsuranceClass?
+  personalPremium   Decimal?             @db.Decimal(10, 2)
+  companyPremium    Decimal?             @db.Decimal(10, 2)
+  isActive          Boolean              @default(true)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@unique([employeeProfileId, legalEntityId])
+}
+
+model LaborPension {
+  id                String              @id @default(cuid())
+  employeeProfileId String
+  employeeProfile   EmployeeProfile     @relation(fields: [employeeProfileId], references: [id])
+  legalEntityId     String
+  legalEntity       LegalEntity         @relation(fields: [legalEntityId], references: [id])
+  isEnrolled        Boolean             @default(true)
+  nonEnrollReason   NonInsuranceReason?
+  monthlySalary     Int?
+  contributionRate  Decimal?            @db.Decimal(5, 2)
+  personalContrib   Decimal?            @db.Decimal(10, 2)
+  companyContrib    Decimal?            @db.Decimal(10, 2)
+  isActive          Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([employeeProfileId, legalEntityId])
+}
+
+model HealthInsurance {
+  id                String                @id @default(cuid())
+  employeeProfileId String
+  employeeProfile   EmployeeProfile       @relation(fields: [employeeProfileId], references: [id])
+  legalEntityId     String
+  legalEntity       LegalEntity           @relation(fields: [legalEntityId], references: [id])
+  isEnrolled        Boolean               @default(true)
+  nonEnrollReason   NonInsuranceReason?
+  insuranceSalary   Int?
+  insuranceClass    HealthInsuranceClass?
+  personalPremium   Decimal?              @db.Decimal(10, 2)
+  companyPremium    Decimal?              @db.Decimal(10, 2)
+  isActive          Boolean               @default(true)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([employeeProfileId, legalEntityId])
+}
+
+model EmployeeTaxWithholding {
+  id                 String          @id @default(cuid())
+  employeeProfileId  String
+  employeeProfile    EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
+  legalEntityId      String
+  legalEntity        LegalEntity     @relation(fields: [legalEntityId], references: [id])
+  residentialAddress String?
+  incomeCategory     String?
+  withholdingRate    Decimal?        @db.Decimal(5, 2)
+  taxExemptAmount    Int?
+  isActive           Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([employeeProfileId, legalEntityId])
+}
+
+model EmployeeMovement {
+  id                String          @id @default(cuid())
+  employeeProfileId String
+  employeeProfile   EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
+  legalEntityId     String
+  legalEntity       LegalEntity     @relation(fields: [legalEntityId], references: [id])
+  movementType      MovementType
+  movementDate      DateTime        @db.Date
+  notes             String?
+  createdAt         DateTime        @default(now())
 }
