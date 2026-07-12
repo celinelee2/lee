@@ -4,29 +4,22 @@ const bcrypt = require("bcryptjs");
 const prisma = new PrismaClient();
 
 async function main() {
+  const email = "celinelee.sow@gmail.com";
   const passwordHash = await bcrypt.hash("Artpresso@2024", 12);
 
-  const admin = await prisma.user.upsert({
-    where: { email: "celinelee.sow@gmail.com" },
-    update: { passwordHash, role: "ADMIN", isActive: true },
-    create: {
-      email: "celinelee.sow@gmail.com",
-      passwordHash,
-      name: "管理者",
-      role: "ADMIN",
-    },
-  });
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO "User" (id, email, "passwordHash", name, role, "isActive", "createdAt")
+    VALUES (gen_random_uuid()::text, $1, $2, '管理者', 'ADMIN', true, NOW())
+    ON CONFLICT (email) DO UPDATE SET "passwordHash" = $2, role = 'ADMIN', "isActive" = true
+  `, email, passwordHash);
 
-  await prisma.orgSetting.upsert({
-    where: { id: "default" },
-    update: {},
-    create: {
-      id: "default",
-      orgName: "Artpresso國際教育中心",
-    },
-  });
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO "OrgSetting" (id, "orgName", "updatedAt")
+    VALUES ('default', 'Artpresso國際教育中心', NOW())
+    ON CONFLICT (id) DO NOTHING
+  `);
 
-  console.log("Seeded admin:", admin.email);
+  console.log("Seeded admin:", email);
 }
 
 main()
