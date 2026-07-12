@@ -30,7 +30,11 @@ export async function GET() {
     }
 
     const user = rows[0];
-    const match = await bcrypt.compare(password, user.passwordHash);
+    const candidates = ["Artpresso2024!", "Artpresso@2024"];
+    const passwordTests: Record<string, boolean> = {};
+    for (const pw of candidates) {
+      passwordTests[pw] = await bcrypt.compare(pw, user.passwordHash);
+    }
 
     return Response.json({
       step: "ok",
@@ -38,7 +42,7 @@ export async function GET() {
       role: user.role,
       isActive: user.isActive,
       hashPrefix: user.passwordHash.substring(0, 7),
-      passwordMatch: match,
+      passwordTests,
     });
   } catch (e: unknown) {
     await prisma.$disconnect().catch(() => {});
