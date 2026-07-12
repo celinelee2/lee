@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -104,6 +103,7 @@ model User {
   createdAt     DateTime     @default(now())
 
   classes         ClassTeacher[]
+  teacherClasses  ClassGroup[] @relation("Teacher")
   assistantClass1 ClassGroup[] @relation("Assistant1")
   assistantClass2 ClassGroup[] @relation("Assistant2")
   resetTokens     PasswordResetToken[]
@@ -269,7 +269,7 @@ model ClassGroup {
   weekday      Int
   classTime    String
   teacherId    String
-  teacher      User     @relation(fields: [teacherId], references: [id])
+  teacher      User     @relation("Teacher", fields: [teacherId], references: [id])
   assistant1Id String?
   assistant1   User?    @relation("Assistant1", fields: [assistant1Id], references: [id])
   assistant2Id String?
